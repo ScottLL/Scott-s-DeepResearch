@@ -21,4 +21,5 @@ libxcb-dri3-0
 libxcursor1
 libxi6
 libxtst6
-libxss1 
+libxss1
+poppler-utils 

@@ -30,3 +30,6 @@ aiohttp>=3.8.5
 httpx>=0.24.1
 pytz>=2023.3
 streamlit>=1.28.0
+
+# Added from the code block
+pdf2image>=1.16.3

@@ -17,6 +17,9 @@ import openai
 import logging
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
+from contextlib import asynccontextmanager
+import streamlit.cli as stcli
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1612,3 +1615,81 @@ try:
     )
 except Exception as e:
     st.error(f"Failed to initialize Playwright: {str(e)}")
+
+class BrowserManager:
+    def __init__(self):
+        self.playwright = None
+        self.browser = None
+        
+    async def start(self):
+        if not self.playwright:
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-dev-shm-usage']
+            )
+            
+    async def stop(self):
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
+            
+    @asynccontextmanager
+    async def get_context(self):
+        try:
+            context = await self.browser.new_context()
+            yield context
+        finally:
+            await context.close()
+
+# Initialize the browser manager in Streamlit's session state
+if 'browser_manager' not in st.session_state:
+    # Install playwright on first run
+    import subprocess
+    subprocess.run(['playwright', 'install'], check=True)
+    subprocess.run(['playwright', 'install-deps'], check=True)
+    
+    # Create browser manager
+    st.session_state.browser_manager = BrowserManager()
+    # Initialize the browser
+    asyncio.run(st.session_state.browser_manager.start())
+
+# Ensure cleanup on session end
+def cleanup():
+    if 'browser_manager' in st.session_state:
+        asyncio.run(st.session_state.browser_manager.stop())
+        del st.session_state.browser_manager
+
+# Register cleanup
+import atexit
+atexit.register(cleanup)
+
+async def crawl_url(url):
+    browser_manager = st.session_state.browser_manager
+    async with browser_manager.get_context() as context:
+        page = await context.new_page()
+        try:
+            await page.goto(url, timeout=30000)
+            content = await page.content()
+            return content
+        except Exception as e:
+            st.error(f"Error crawling {url}: {str(e)}")
+            return None
+        finally:
+            await page.close()
+
+# Use it in your Streamlit app
+if st.button("Crawl"):
+    url = st.text_input("Enter URL")
+    if url:
+        content = asyncio.run(crawl_url(url))
+        if content:
+            st.write("Crawling successful!")
+
+if __name__ == "__main__":
+    try:
+        sys.exit(stcli.main())
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        sys.exit(1)
