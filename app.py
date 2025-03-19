@@ -16,6 +16,7 @@ import json
 import openai
 import logging
 from dotenv import load_dotenv
+import subprocess
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1586,3 +1587,20 @@ if st.session_state['research_phase'] != 'initial':
 # Footer
 st.markdown("---")
 st.markdown("Built with Streamlit and Crawl4AI 🚀")
+
+def ensure_playwright_browsers():
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            if not p.chromium.executable_path:
+                print("Installing Playwright browsers...")
+                subprocess.run(["playwright", "install", "chromium"], check=True)
+            return True
+    except Exception as e:
+        st.error(f"Error ensuring Playwright browsers: {str(e)}")
+        return False
+
+# Add this check before your main app code
+if not ensure_playwright_browsers():
+    st.error("Failed to initialize browsers. Please check the logs for details.")
+    st.stop()
