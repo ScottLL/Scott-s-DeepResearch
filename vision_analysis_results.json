@@ -1,0 +1,21 @@
+{
+  "total_regions": 1,
+  "regions": [
+    {
+      "region_id": 1,
+      "bounds": {
+        "top": 36,
+        "bottom": 350,
+        "left": 8,
+        "right": 251
+      },
+      "vision_description": "The image features a sleek, modern electric shaver with a transparent design that showcases its internal components. The shaver is positioned prominently, with its head slightly tilted to emphasize the shaving mechanism.\n\nIn the foreground, there is a circuit chip labeled \"BRAUN,\" indicating the brand and possibly showcasing advanced technology. The background is dark, creating a contrast that highlights the shaver's glossy and intricate structure.\n\nOn the top left, there are text elements in Chinese, stating \"‘Race Car’ Turbo Smart\" with a tagline that suggests immediate cleaning. This adds to the high-tech aesthetic and implies innovative features of the shaver. The overall layout combines a professional, technical presentation with a modern design appealing to consumers interested in high-quality grooming products.",
+      "text_content": {
+        "columns": [],
+        "merged_paragraphs": [
+          "「跑车级」转速马达 一剃即净不扯须"
+        ]
+      }
+    }
+  ]
+}
