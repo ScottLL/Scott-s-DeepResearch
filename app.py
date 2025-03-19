@@ -41,6 +41,9 @@ os.environ["STREAMLIT_DISABLE_WATCHER"] = "true"  # Disable Streamlit's module w
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"  # Only show error-level logs from Streamlit
 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Disable usage statistics
 
+# Disable file watcher to prevent inotify limits issue
+os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
+
 # Define AlwaysAllStdin class
 class AlwaysAllStdin:
     def readline(self, *args, **kwargs):
@@ -1618,78 +1621,86 @@ except Exception as e:
 
 class BrowserManager:
     def __init__(self):
-        self.playwright = None
-        self.browser = None
+        self._playwright = None
+        self._browser = None
         
-    async def start(self):
-        if not self.playwright:
-            self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch(
+    async def __aenter__(self):
+        if not self._playwright:
+            self._playwright = await async_playwright().start()
+            self._browser = await self._playwright.chromium.launch(
                 headless=True,
                 args=['--no-sandbox', '--disable-dev-shm-usage']
             )
-            
-    async def stop(self):
-        if self.browser:
-            await self.browser.close()
-        if self.playwright:
-            await self.playwright.stop()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._browser:
+            await self._browser.close()
+        if self._playwright:
+            await self._playwright.stop()
             
     @asynccontextmanager
     async def get_context(self):
+        if not self._browser:
+            await self.__aenter__()
+        context = await self._browser.new_context()
         try:
-            context = await self.browser.new_context()
             yield context
         finally:
             await context.close()
 
-# Initialize the browser manager in Streamlit's session state
-if 'browser_manager' not in st.session_state:
+# Initialize Playwright in session state
+@st.cache_resource
+def initialize_browser():
     # Install playwright on first run
     import subprocess
-    subprocess.run(['playwright', 'install'], check=True)
-    subprocess.run(['playwright', 'install-deps'], check=True)
+    try:
+        subprocess.run(['playwright', 'install'], check=True)
+        subprocess.run(['playwright', 'install-deps'], check=True)
+    except subprocess.CalledProcessError as e:
+        st.error(f"Failed to install Playwright: {str(e)}")
+        return None
     
-    # Create browser manager
-    st.session_state.browser_manager = BrowserManager()
-    # Initialize the browser
-    asyncio.run(st.session_state.browser_manager.start())
+    return BrowserManager()
 
-# Ensure cleanup on session end
-def cleanup():
-    if 'browser_manager' in st.session_state:
-        asyncio.run(st.session_state.browser_manager.stop())
-        del st.session_state.browser_manager
+# Get or create browser manager
+browser_manager = initialize_browser()
 
-# Register cleanup
-import atexit
-atexit.register(cleanup)
+async def crawl_url(url: str) -> str:
+    """Crawl a URL using Playwright"""
+    try:
+        async with browser_manager as bm:
+            async with await bm.get_context() as context:
+                page = await context.new_page()
+                try:
+                    await page.goto(url, timeout=30000)
+                    content = await page.content()
+                    return content
+                finally:
+                    await page.close()
+    except Exception as e:
+        st.error(f"Error crawling {url}: {str(e)}")
+        return None
 
-async def crawl_url(url):
-    browser_manager = st.session_state.browser_manager
-    async with browser_manager.get_context() as context:
-        page = await context.new_page()
+# Main Streamlit app
+def main():
+    st.title("Web Crawler")
+    
+    url = st.text_input("Enter URL to crawl")
+    
+    if st.button("Crawl") and url:
+        # Create new event loop for async operation
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            await page.goto(url, timeout=30000)
-            content = await page.content()
-            return content
+            content = loop.run_until_complete(crawl_url(url))
+            if content:
+                st.success("Successfully crawled the URL!")
+                st.text_area("Content", content[:1000] + "...")
         except Exception as e:
-            st.error(f"Error crawling {url}: {str(e)}")
-            return None
+            st.error(f"Failed to crawl URL: {str(e)}")
         finally:
-            await page.close()
-
-# Use it in your Streamlit app
-if st.button("Crawl"):
-    url = st.text_input("Enter URL")
-    if url:
-        content = asyncio.run(crawl_url(url))
-        if content:
-            st.write("Crawling successful!")
+            loop.close()
 
 if __name__ == "__main__":
-    try:
-        sys.exit(stcli.main())
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-        sys.exit(1)
+    main()
