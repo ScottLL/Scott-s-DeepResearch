@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from playwright.async_api import async_playwright
 from contextlib import asynccontextmanager
-import streamlit.cli as stcli
 
 # Load environment variables from .env file
 load_dotenv()
