@@ -34,17 +34,19 @@ class WebCrawler:
         self.browser_config = BrowserConfig(
             headless=True,
             browser_type='chromium',  # Only use Chromium
-            browser_args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--no-zygote',
-                '--single-process',  # More stable in cloud environments
-                '--disable-gpu',
-                '--disable-infobars',
-                '--disable-notifications',
-                '--disable-popup-blocking',
-            ]
+            launch_options={  # Changed from browser_args to launch_options
+                'args': [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--no-zygote',
+                    '--single-process',  # More stable in cloud environments
+                    '--disable-gpu',
+                    '--disable-infobars',
+                    '--disable-notifications',
+                    '--disable-popup-blocking',
+                ]
+            }
         ) if has_crawl4ai else None
         
         # Default run configuration - DISABLED IFRAME PROCESSING and SHORT TIMEOUT
@@ -154,7 +156,7 @@ class WebCrawler:
                     simple_config = BrowserConfig(
                         headless=True,
                         browser_type='chromium',
-                        browser_args=['--no-sandbox']
+                        launch_options={'args': ['--no-sandbox']}  # Changed from browser_args to launch_options
                     )
                     self.crawler = AsyncWebCrawler(config=simple_config)
                     await self.crawler.__aenter__()
