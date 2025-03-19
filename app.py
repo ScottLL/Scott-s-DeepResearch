@@ -16,9 +16,6 @@ import json
 import openai
 import logging
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
-from playwright.async_api import async_playwright
-from contextlib import asynccontextmanager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,9 +36,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Disable tokenizers parallelism
 os.environ["STREAMLIT_DISABLE_WATCHER"] = "true"  # Disable Streamlit's module watcher
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"  # Only show error-level logs from Streamlit
 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Disable usage statistics
-
-# Disable file watcher to prevent inotify limits issue
-os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
 
 # Define AlwaysAllStdin class
 class AlwaysAllStdin:
@@ -350,8 +344,6 @@ if 'all_clarifying_questions' not in st.session_state:
     st.session_state['all_clarifying_questions'] = []
 if 'preset_mode' not in st.session_state:
     st.session_state['preset_mode'] = "Standard Research"  # Default preset mode
-if 'mode' not in st.session_state:
-    st.session_state['mode'] = "Research Query"  # Default mode
 
 # Helper function to run async tasks
 def run_async(coro, event):
@@ -396,7 +388,7 @@ Enter a query or URL below to get started!
 with st.sidebar:
     st.header("Research Settings")
     
-    mode = st.radio("Mode", ["Research Query", "Website Crawl"], key="mode")
+    mode = st.radio("Mode", ["Research Query", "Website Crawl"])
     
     # Add preset research mode selector
     st.subheader("Research Depth")
@@ -1589,117 +1581,8 @@ if st.session_state['research_phase'] != 'initial':
         st.session_state['clarifying_responses'] = {}
         st.session_state['all_clarifying_questions'] = []
         st.session_state['preset_mode'] = "Standard Research"  # Default preset mode
-        st.session_state['mode'] = "Research Query"  # Default mode
         st.rerun()
 
 # Footer
 st.markdown("---")
 st.markdown("Built with Streamlit and Crawl4AI 🚀")
-
-# Install playwright browsers on first run
-if 'playwright_installed' not in st.session_state:
-    import subprocess
-    subprocess.run(['playwright', 'install'])
-    subprocess.run(['playwright', 'install-deps'])
-    st.session_state.playwright_installed = True
-
-# Initialize playwright in a proper way
-@st.cache_resource
-def get_playwright():
-    return sync_playwright().start()
-
-# Get the browser instance
-try:
-    playwright = get_playwright()
-    browser = playwright.chromium.launch(
-        headless=True,
-        args=['--no-sandbox', '--disable-dev-shm-usage']
-    )
-except Exception as e:
-    st.error(f"Failed to initialize Playwright: {str(e)}")
-
-class BrowserManager:
-    def __init__(self):
-        self._playwright = None
-        self._browser = None
-        
-    async def __aenter__(self):
-        if not self._playwright:
-            self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-dev-shm-usage']
-            )
-        return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._browser:
-            await self._browser.close()
-        if self._playwright:
-            await self._playwright.stop()
-            
-    @asynccontextmanager
-    async def get_context(self):
-        if not self._browser:
-            await self.__aenter__()
-        context = await self._browser.new_context()
-        try:
-            yield context
-        finally:
-            await context.close()
-
-# Initialize Playwright in session state
-@st.cache_resource
-def initialize_browser():
-    # Install playwright on first run
-    import subprocess
-    try:
-        subprocess.run(['playwright', 'install'], check=True)
-        subprocess.run(['playwright', 'install-deps'], check=True)
-    except subprocess.CalledProcessError as e:
-        st.error(f"Failed to install Playwright: {str(e)}")
-        return None
-    
-    return BrowserManager()
-
-# Get or create browser manager
-browser_manager = initialize_browser()
-
-async def crawl_url(url: str) -> str:
-    """Crawl a URL using Playwright"""
-    try:
-        async with browser_manager as bm:
-            async with await bm.get_context() as context:
-                page = await context.new_page()
-                try:
-                    await page.goto(url, timeout=30000)
-                    content = await page.content()
-                    return content
-                finally:
-                    await page.close()
-    except Exception as e:
-        st.error(f"Error crawling {url}: {str(e)}")
-        return None
-
-# Main Streamlit app
-def main():
-    st.title("Web Crawler")
-    
-    url = st.text_input("Enter URL to crawl")
-    
-    if st.button("Crawl") and url:
-        # Create new event loop for async operation
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            content = loop.run_until_complete(crawl_url(url))
-            if content:
-                st.success("Successfully crawled the URL!")
-                st.text_area("Content", content[:1000] + "...")
-        except Exception as e:
-            st.error(f"Failed to crawl URL: {str(e)}")
-        finally:
-            loop.close()
-
-if __name__ == "__main__":
-    main()
