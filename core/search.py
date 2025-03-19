@@ -34,38 +34,38 @@ def search_with_google(query: str, num_results: int = 5) -> list:
         logging.warning("Google search not available. Install with: pip install google")
         return results
     
-    # Try multiple approaches based on the error message
     try:
-        logging.info("Using Google search with 'term' parameter")
-        # Based on your error message, your library uses 'term' parameter
-        for url in google_search(term=query, num_results=num_results*2):
-            if url not in results:
+        # Use the googlesearch-python package with supported parameters
+        from googlesearch import search
+        logging.info(f"Starting Google search for: {query}")
+        
+        # Get more results than needed to account for filtering
+        search_results = search(
+            query,
+            num_results=num_results * 2,
+            lang="en",
+            advanced=False,
+            sleep_interval=2,
+            timeout=10
+        )
+        
+        # Process results
+        for url in search_results:
+            if url and url not in results:
                 results.append(url)
+                logging.info(f"Found result: {url}")
                 if len(results) >= num_results:
                     break
-                    
-        logging.info(f"Google search for '{query}' returned {len(results)} results")
-        return results[:num_results]
-    except Exception as e1:
-        logging.warning(f"First Google search approach failed: {e1}")
         
-        # Try second approach - just query
-        try:
-            logging.info("Trying basic Google search approach")
-            for url in google_search(query):
-                if url not in results:
-                    results.append(url)
-                    if len(results) >= num_results:
-                        break
-                        
-            logging.info(f"Basic Google search for '{query}' returned {len(results)} results")
-            return results[:num_results]
-        except Exception as e2:
-            logging.warning(f"Second Google search approach failed: {e2}")
-    
-    # If we get here, both approaches failed
-    logging.error("All Google search approaches failed")
-    return []
+        logging.info(f"Google search completed. Found {len(results)} results")
+        return results[:num_results]
+        
+    except Exception as e:
+        logging.error(f"Google search failed: {str(e)}")
+        # Try fallback to direct URL if search fails
+        fallback_url = f"https://www.google.com/search?q={quote_plus(query)}"
+        logging.info(f"Using fallback URL: {fallback_url}")
+        return [fallback_url]
 
 def direct_baidu_search(query: str, num_results: int = 5) -> list:
     """

@@ -118,22 +118,13 @@ class WebCrawler:
             raise ImportError("crawl4ai not available - cannot create crawler")
             
         if self.crawler is None:
-            # Configure with correct parameters
+            # Configure with correct parameters (without using default_timeout which isn't supported)
             self.browser_config = BrowserConfig(
-                headless=True,
-                browser_type="chromium",  # Explicitly specify browser type
-                launch_options={
-                    "args": [
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-accelerated-2d-canvas",
-                        "--disable-gpu"
-                    ]
-                }
+                headless=True
+                # No default_timeout parameter - it's not supported by BrowserConfig
             )
             self.crawler = AsyncWebCrawler(config=self.browser_config)
-            await self.crawler.start()  # Start the crawler and initialize the browser
+            await self.crawler.__aenter__()  # Enter the async context for the crawler
     
     async def close(self):
         """Close the crawler when done."""
