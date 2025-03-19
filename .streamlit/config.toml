@@ -10,7 +10,6 @@ enableCORS = false
 headless = true
 
 [runner]
-# Handle browser-related operations
 fastReruns = true
 enforceSerializableSessionState = false
 
