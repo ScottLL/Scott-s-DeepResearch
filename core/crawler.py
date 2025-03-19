@@ -192,6 +192,9 @@ class WebCrawler:
         Returns:
             Dict with page data (url, title, content, links)
         """
+        # Ensure crawler is initialized
+        await self._ensure_crawler()
+        
         # Check if the URL is a PDF
         if self._is_pdf_file(url):
             return await self._process_pdf_with_ocr(url)
