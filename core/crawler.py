@@ -34,7 +34,7 @@ class WebCrawler:
         self.browser_config = BrowserConfig(
             headless=True,
             browser_type='chromium',  # Only use Chromium
-            browser_args=[  # Changed to use args directly
+            launch_options=[  # Use launch_options instead of browser_args or args
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
