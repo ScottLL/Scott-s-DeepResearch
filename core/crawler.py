@@ -30,23 +30,21 @@ class WebCrawler:
         if not has_crawl4ai:
             logging.warning("crawl4ai not available - crawler will have limited functionality")
             
-        # Initialize browser configuration with explicit settings for Chromium only
+        # Initialize browser configuration with correct parameters
         self.browser_config = BrowserConfig(
             headless=True,
             browser_type='chromium',  # Only use Chromium
-            launch_options={
-                'args': [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--no-zygote',
-                    '--single-process',  # More stable in cloud environments
-                    '--disable-gpu',
-                    '--disable-infobars',
-                    '--disable-notifications',
-                    '--disable-popup-blocking',
-                ]
-            }
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--no-zygote',
+                '--single-process',  # More stable in cloud environments
+                '--disable-gpu',
+                '--disable-infobars',
+                '--disable-notifications',
+                '--disable-popup-blocking',
+            ]
         ) if has_crawl4ai else None
         
         # Default run configuration - DISABLED IFRAME PROCESSING and SHORT TIMEOUT
