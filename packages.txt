@@ -22,4 +22,6 @@ libxcursor1
 libxi6
 libxtst6
 libxss1
-poppler-utils 
+poppler-utils
+chromium-browser
+chromium-chromedriver 

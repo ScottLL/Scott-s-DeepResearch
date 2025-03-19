@@ -30,8 +30,24 @@ class WebCrawler:
         if not has_crawl4ai:
             logging.warning("crawl4ai not available - crawler will have limited functionality")
             
-        # Initialize a headless browser configuration for Crawl4AI
-        self.browser_config = BrowserConfig() if has_crawl4ai else None
+        # Initialize browser configuration with explicit settings
+        self.browser_config = BrowserConfig(
+            headless=True,
+            browser_type='chromium',  # Explicitly specify browser type
+            launch_options={
+                'args': [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--disable-gpu',
+                    '--disable-infobars',
+                    '--window-position=0,0',
+                    '--ignore-certifcate-errors',
+                    '--ignore-certifcate-errors-spki-list',
+                ]
+            }
+        ) if has_crawl4ai else None
         
         # Default run configuration - DISABLED IFRAME PROCESSING and SHORT TIMEOUT
         self.default_run_config = CrawlerRunConfig(
@@ -113,18 +129,40 @@ class WebCrawler:
         ]
 
     async def _ensure_crawler(self):
-        """Ensure the AsyncWebCrawler is initialized (called before any crawl)."""
+        """Ensure the AsyncWebCrawler is initialized with proper error handling."""
         if not has_crawl4ai:
             raise ImportError("crawl4ai not available - cannot create crawler")
             
         if self.crawler is None:
-            # Configure with correct parameters (without using default_timeout which isn't supported)
-            self.browser_config = BrowserConfig(
-                headless=True
-                # No default_timeout parameter - it's not supported by BrowserConfig
-            )
-            self.crawler = AsyncWebCrawler(config=self.browser_config)
-            await self.crawler.__aenter__()  # Enter the async context for the crawler
+            try:
+                # Initialize crawler with retry logic
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        self.crawler = AsyncWebCrawler(config=self.browser_config)
+                        await self.crawler.__aenter__()
+                        logging.info("Crawler initialized successfully")
+                        break
+                    except Exception as e:
+                        if attempt == max_retries - 1:
+                            raise Exception(f"Failed to initialize crawler after {max_retries} attempts: {str(e)}")
+                        logging.warning(f"Attempt {attempt + 1} failed, retrying...")
+                        await asyncio.sleep(1)
+                    
+            except Exception as e:
+                logging.error(f"Error initializing crawler: {str(e)}")
+                # Fallback to simpler configuration
+                try:
+                    simple_config = BrowserConfig(
+                        headless=True,
+                        browser_type='chromium',
+                        launch_options={'args': ['--no-sandbox']}
+                    )
+                    self.crawler = AsyncWebCrawler(config=simple_config)
+                    await self.crawler.__aenter__()
+                    logging.info("Crawler initialized with fallback configuration")
+                except Exception as fallback_error:
+                    raise Exception(f"Both primary and fallback crawler initialization failed: {str(fallback_error)}")
     
     async def close(self):
         """Close the crawler when done."""

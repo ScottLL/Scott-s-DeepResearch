@@ -7,6 +7,7 @@ gatherUsageStats = false
 maxUploadSize = 200
 enableXsrfProtection = false
 enableCORS = false
+headless = true
 
 [runner]
 # Handle browser-related operations
