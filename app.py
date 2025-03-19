@@ -161,120 +161,44 @@ def convert_md_with_embedded_images(md_content):
 
 # Add this new function to handle markdown rendering safely
 def safe_render_markdown(md_content):
-    """Generate HTML file for download and display content as plain text"""
-    
+    """Safely render markdown content in Streamlit"""
     try:
-        # Generate HTML file for download
-        import markdown
-        import tempfile
-        import os
+        # Split content into smaller chunks to avoid rendering issues
+        max_chunk_size = 5000  # Reduced chunk size for better stability
+        chunks = []
+        current_chunk = ""
         
-        # Pre-process problematic patterns
-        processed_md = md_content
-        processed_md = re.sub(r'!\[!', r'![', processed_md)
-        processed_md = re.sub(r'!\[;\]', r'![Image]', processed_md)
+        # Split at paragraph markers
+        paragraphs = md_content.split("\n\n")
         
-        # Convert markdown to HTML 
-        html_content = markdown.markdown(
-            processed_md, 
-            extensions=['tables', 'nl2br', 'fenced_code', 'codehilite']
-        )
+        for para in paragraphs:
+            if len(current_chunk) + len(para) > max_chunk_size:
+                chunks.append(current_chunk)
+                current_chunk = para + "\n\n"
+            else:
+                current_chunk += para + "\n\n"
+                
+        # Add the last chunk if it has content
+        if current_chunk:
+            chunks.append(current_chunk)
         
-        # Create HTML document
-        full_html = f"""<!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Research Report</title>
-            <style>
-                body {{ 
-                    font-family: Arial, sans-serif; 
-                    line-height: 1.6; 
-                    max-width: 800px; 
-                    margin: 0 auto; 
-                    padding: 20px; 
-                }}
-                img {{ 
-                    max-width: 100%; 
-                    height: auto; 
-                    display: block;
-                    margin: 20px auto;
-                }}
-                h1, h2, h3, h4, h5, h6 {{ 
-                    margin-top: 24px; 
-                    margin-bottom: 16px; 
-                }}
-                p {{ margin-bottom: 16px; }}
-                .img-caption {{ 
-                    font-style: italic; 
-                    text-align: center; 
-                    margin-top: -15px; 
-                    margin-bottom: 20px;
-                }}
-            </style>
-        </head>
-        <body>
-            {html_content}
-        </body>
-        </html>"""
-        
-        # Save to temp file
-        temp_dir = tempfile.gettempdir()
-        html_file_path = os.path.join(temp_dir, "report_preview.html")
-        
-        with open(html_file_path, "w", encoding="utf-8") as f:
-            f.write(full_html)
-        
-        # DISPLAY SECTION - No markdown rendering at all
-        
-        # Use plain text for all UI elements
-        st.text("--- RESEARCH REPORT PREVIEW ---")
-        st.text("Download the HTML version for proper formatting and images:")
-        
-        # Create download button for the HTML
-        with open(html_file_path, "r", encoding="utf-8") as f:
-            html_data = f.read()
-            st.download_button(
-                label="Download Complete HTML Report",
-                data=html_data,
-                file_name="report_preview.html",
-                mime="text/html"
+        # Display each chunk separately
+        for i, chunk in enumerate(chunks):
+            # Convert to HTML
+            chunk_html = markdown.markdown(
+                chunk,
+                extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']
             )
-        
-        st.text("-------------")
-        st.text("CONTENT PREVIEW (PLAIN TEXT VERSION):")
-        st.text("-------------")
-        
-        # Replace markdown formatting with simple text equivalents
-        plain_text = re.sub(r'!\[.*?\]\(.*?\)', '[IMAGE]', md_content)  # Replace images
-        plain_text = re.sub(r'<[^>]*>', '', plain_text)  # Remove HTML tags
-        
-        # Limit preview length to prevent performance issues
-        max_length = 6000  # About 2-3 pages of text
-        if len(plain_text) > max_length:
-            preview_text = plain_text[:max_length] + "\n\n[... Content truncated. Download the HTML report for the complete version ...]"
-        else:
-            preview_text = plain_text
-        
-        # Display in chunks to avoid rendering issues with very long text
-        chunk_size = 2000  # Split into ~2000 character chunks
-        for i in range(0, len(preview_text), chunk_size):
-            chunk = preview_text[i:i+chunk_size]
-            st.text_area(
-                label=f"Part {i//chunk_size + 1}", 
-                value=chunk,
-                height=min(300, len(chunk.split('\n'))*20)
-            )
+            
+            # Create a container for each chunk
+            with st.container():
+                st.markdown(chunk_html, unsafe_allow_html=True)
         
         return True
     except Exception as e:
-        st.error(f"Error: {str(e)}")
-        
-        # Ultra-minimal fallback
-        st.text_area(label="Raw content:", value=md_content[:5000], height=300)
-        if len(md_content) > 5000:
-            st.text("[Content truncated due to length]")
-        
+        st.error(f"Error rendering markdown: {str(e)}")
+        # Fallback to plain text display
+        st.text_area("Content (couldn't render properly):", md_content, height=500)
         return False
 
 # Configure page settings
@@ -832,38 +756,10 @@ elif st.session_state['research_phase'] == 'crawling':
                             caption_pattern = r'\*(Image from \[Source \d+\].*?)\*'
                             md_content_with_images = re.sub(caption_pattern, r'<div class="img-caption">\1</div>', md_content_with_images)
                             
-                            # Split content into manageable chunks at paragraph breaks
-                            max_chunk_size = 10000
-                            chunks = []
-                            current_chunk = ""
-                            
-                            # Split at paragraph markers
-                            paragraphs = md_content_with_images.split("\n\n")
-                            
-                            for para in paragraphs:
-                                if len(current_chunk) + len(para) > max_chunk_size:
-                                    chunks.append(current_chunk)
-                                    current_chunk = para + "\n\n"
-                                else:
-                                    current_chunk += para + "\n\n"
-                                    
-                            # Add the last chunk if it has content
-                            if current_chunk:
-                                chunks.append(current_chunk)
-                            
-                            # Display each chunk separately
-                            for i, chunk in enumerate(chunks):
-                                # Convert to HTML
-                                chunk_html = markdown.markdown(
-                                    chunk,
-                                    extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']
-                                )
-                                
-                                # Create a container for each chunk
-                                with st.container():
-                                    st.markdown(chunk_html, unsafe_allow_html=True)
+                            # Use the safe rendering function
+                            safe_render_markdown(md_content_with_images)
                         except Exception as e:
-                            st.error(f"Error rendering markdown: {str(e)}")
+                            st.error(f"Error rendering content: {str(e)}")
                             st.text_area("Content (couldn't render properly):", md_content, height=500)
                     
                     with tab2:
@@ -1423,41 +1319,10 @@ elif st.session_state['research_phase'] == 'research':
                             caption_pattern = r'\*(Image from \[Source \d+\].*?)\*'
                             md_content_with_images = re.sub(caption_pattern, r'<div class="img-caption">\1</div>', md_content_with_images)
                             
-                            # Instead of using st.markdown directly, split content into smaller chunks
-                            # to avoid the ElementNode error
-                            max_chunk_size = 10000  # Try a smaller chunk size
-                            
-                            # Split content into manageable chunks at paragraph breaks
-                            chunks = []
-                            current_chunk = ""
-                            
-                            # Split at paragraph markers
-                            paragraphs = md_content_with_images.split("\n\n")
-                            
-                            for para in paragraphs:
-                                if len(current_chunk) + len(para) > max_chunk_size:
-                                    chunks.append(current_chunk)
-                                    current_chunk = para + "\n\n"
-                                else:
-                                    current_chunk += para + "\n\n"
-                                    
-                            # Add the last chunk if it has content
-                            if current_chunk:
-                                chunks.append(current_chunk)
-                            
-                            # Display each chunk separately
-                            for i, chunk in enumerate(chunks):
-                                # Convert to HTML
-                                chunk_html = markdown.markdown(
-                                    chunk,
-                                    extensions=['markdown.extensions.fenced_code', 'markdown.extensions.tables']
-                                )
-                                
-                                # Create a container for each chunk
-                                with st.container():
-                                    st.markdown(chunk_html, unsafe_allow_html=True)
+                            # Use the safe rendering function
+                            safe_render_markdown(md_content_with_images)
                         except Exception as e:
-                            st.error(f"Error rendering markdown: {str(e)}")
+                            st.error(f"Error rendering content: {str(e)}")
                             st.text_area("Content (couldn't render properly):", md_content, height=500)
                     
                     with tab2:
