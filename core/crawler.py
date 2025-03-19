@@ -33,18 +33,7 @@ class WebCrawler:
         # Initialize browser configuration with correct parameters
         self.browser_config = BrowserConfig(
             headless=True,
-            browser_type='chromium',  # Only use Chromium
-            launch_options=[  # Use launch_options instead of browser_args or args
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--no-zygote',
-                '--single-process',  # More stable in cloud environments
-                '--disable-gpu',
-                '--disable-infobars',
-                '--disable-notifications',
-                '--disable-popup-blocking',
-            ]
+            browser_type='chromium'  # Only use Chromium
         ) if has_crawl4ai else None
         
         # Default run configuration - DISABLED IFRAME PROCESSING and SHORT TIMEOUT
