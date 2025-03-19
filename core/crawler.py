@@ -34,7 +34,7 @@ class WebCrawler:
         self.browser_config = BrowserConfig(
             headless=True,
             browser_type='chromium',  # Only use Chromium
-            args=[
+            browser_args=[
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
@@ -154,7 +154,7 @@ class WebCrawler:
                     simple_config = BrowserConfig(
                         headless=True,
                         browser_type='chromium',
-                        launch_options={'args': ['--no-sandbox']}
+                        browser_args=['--no-sandbox']
                     )
                     self.crawler = AsyncWebCrawler(config=simple_config)
                     await self.crawler.__aenter__()
