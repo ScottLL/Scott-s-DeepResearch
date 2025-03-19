@@ -11,6 +11,12 @@ asyncio>=3.4.3
 crawl4ai>=0.5.0
 duckduckgo_search>=3.8.0
 googlesearch-python>=1.2.3
+playwright>=1.40.0
+pytest-playwright>=0.7.0
+
+# Browser dependencies for Streamlit Cloud
+playwright-chromium>=1.40.0  # Specific browser package
+playwright-core>=1.40.0      # Core package
 
 # Optional dependencies for improved functionality
 python-dotenv>=1.0.0

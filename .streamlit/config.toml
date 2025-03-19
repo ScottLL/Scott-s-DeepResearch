@@ -1,0 +1,20 @@
+[browser]
+serverAddress = "localhost"
+gatherUsageStats = false
+
+[server]
+maxUploadSize = 200
+enableXsrfProtection = true
+enableCORS = false
+
+[runner]
+# Handle browser-related operations
+fastReruns = true
+enforceSerializableSessionState = false
+
+[theme]
+primaryColor = "#1c83e1"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif" 
