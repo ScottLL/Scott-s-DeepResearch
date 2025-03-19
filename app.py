@@ -344,6 +344,8 @@ if 'all_clarifying_questions' not in st.session_state:
     st.session_state['all_clarifying_questions'] = []
 if 'preset_mode' not in st.session_state:
     st.session_state['preset_mode'] = "Standard Research"  # Default preset mode
+if 'mode' not in st.session_state:
+    st.session_state['mode'] = "Research Query"  # Default mode
 
 # Helper function to run async tasks
 def run_async(coro, event):
@@ -388,7 +390,7 @@ Enter a query or URL below to get started!
 with st.sidebar:
     st.header("Research Settings")
     
-    mode = st.radio("Mode", ["Research Query", "Website Crawl"])
+    mode = st.radio("Mode", ["Research Query", "Website Crawl"], key="mode")
     
     # Add preset research mode selector
     st.subheader("Research Depth")
@@ -1581,6 +1583,7 @@ if st.session_state['research_phase'] != 'initial':
         st.session_state['clarifying_responses'] = {}
         st.session_state['all_clarifying_questions'] = []
         st.session_state['preset_mode'] = "Standard Research"  # Default preset mode
+        st.session_state['mode'] = "Research Query"  # Default mode
         st.rerun()
 
 # Footer
