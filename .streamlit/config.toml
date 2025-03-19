@@ -1,10 +1,11 @@
 [browser]
 serverAddress = "localhost"
+serverPort = 8501
 gatherUsageStats = false
 
 [server]
 maxUploadSize = 200
-enableXsrfProtection = true
+enableXsrfProtection = false
 enableCORS = false
 
 [runner]

@@ -16,6 +16,7 @@ import json
 import openai
 import logging
 from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1589,3 +1590,25 @@ if st.session_state['research_phase'] != 'initial':
 # Footer
 st.markdown("---")
 st.markdown("Built with Streamlit and Crawl4AI 🚀")
+
+# Install playwright browsers on first run
+if 'playwright_installed' not in st.session_state:
+    import subprocess
+    subprocess.run(['playwright', 'install'])
+    subprocess.run(['playwright', 'install-deps'])
+    st.session_state.playwright_installed = True
+
+# Initialize playwright in a proper way
+@st.cache_resource
+def get_playwright():
+    return sync_playwright().start()
+
+# Get the browser instance
+try:
+    playwright = get_playwright()
+    browser = playwright.chromium.launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-dev-shm-usage']
+    )
+except Exception as e:
+    st.error(f"Failed to initialize Playwright: {str(e)}")
