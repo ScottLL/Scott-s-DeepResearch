@@ -142,8 +142,7 @@ class WebCrawler:
                 try:
                     simple_config = BrowserConfig(
                         headless=True,
-                        browser_type='chromium',
-                        args=['--no-sandbox']  # Changed to use args directly
+                        browser_type='chromium'
                     )
                     self.crawler = AsyncWebCrawler(config=simple_config)
                     await self.crawler.__aenter__()

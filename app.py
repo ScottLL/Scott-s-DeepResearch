@@ -37,6 +37,15 @@ os.environ["STREAMLIT_DISABLE_WATCHER"] = "true"  # Disable Streamlit's module w
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"  # Only show error-level logs from Streamlit
 os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Disable usage statistics
 
+# Install Playwright browsers if not already installed
+try:
+    import subprocess
+    subprocess.run(['playwright', 'install', 'chromium'], check=True)
+    logging.info("Playwright browsers installed successfully")
+except Exception as e:
+    logging.error(f"Error installing Playwright browsers: {e}")
+    st.error("⚠️ Failed to install Playwright browsers. The crawler may not work properly.")
+
 # Define AlwaysAllStdin class
 class AlwaysAllStdin:
     def readline(self, *args, **kwargs):
