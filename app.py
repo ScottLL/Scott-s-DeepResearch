@@ -40,8 +40,18 @@ os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"  # Disable usage st
 # Install Playwright browsers if not already installed
 try:
     import subprocess
-    subprocess.run(['playwright', 'install', 'chromium'], check=True)
-    logging.info("Playwright browsers installed successfully")
+    # Use a synchronous, blocking call instead of async
+    result = subprocess.run(['playwright', 'install', 'chromium'], 
+                          capture_output=True,
+                          text=True,
+                          check=False)  # Don't raise exception on non-zero exit
+    
+    if result.returncode == 0:
+        logging.info("Playwright browsers installed successfully")
+    else:
+        error_msg = result.stderr or "Unknown error"
+        logging.error(f"Error installing Playwright browsers: {error_msg}")
+        st.error("⚠️ Failed to install Playwright browsers. The crawler may not work properly.")
 except Exception as e:
     logging.error(f"Error installing Playwright browsers: {e}")
     st.error("⚠️ Failed to install Playwright browsers. The crawler may not work properly.")
