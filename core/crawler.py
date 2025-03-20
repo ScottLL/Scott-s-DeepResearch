@@ -126,6 +126,11 @@ class WebCrawler:
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
+                        # Close any existing crawler first
+                        if self.crawler:
+                            await self.crawler.__aexit__(None, None, None)
+                            self.crawler = None
+                        
                         self.crawler = AsyncWebCrawler(config=self.browser_config)
                         await self.crawler.__aenter__()
                         logging.info("Crawler initialized successfully")
@@ -140,6 +145,10 @@ class WebCrawler:
                 logging.error(f"Error initializing crawler: {str(e)}")
                 # Fallback to simpler configuration
                 try:
+                    if self.crawler:
+                        await self.crawler.__aexit__(None, None, None)
+                        self.crawler = None
+                    
                     simple_config = BrowserConfig(
                         headless=True,
                         browser_type='chromium'
@@ -564,6 +573,17 @@ class WebCrawler:
         all_pages = []
         query_terms = [term.strip() for term in query.split() if len(term.strip()) > 2]
         
+        # Add URL validation helper
+        def is_valid_url(url):
+            if not url:
+                return False
+            if not url.startswith(('http://', 'https://')):
+                return False
+            # Skip internal/external navigation markers
+            if url in ['internal', 'external']:
+                return False
+            return True
+        
         # Detect query language at the beginning
         from analysis import detect_language
         query_language = detect_language(query)
@@ -596,16 +616,20 @@ class WebCrawler:
         scored_results = []
         for result in search_results:
             url = result.get('url')
-            if not url or url in visited_urls:
+            if not url or not is_valid_url(url) or url in visited_urls:
                 continue
                 
-            # Score the URL based on a quick preview
-            relevance_score = await self.preview_url(url, query_terms)
-            scored_results.append({
-                "result": result,
-                "score": relevance_score
-            })
-            
+            try:
+                # Score the URL based on a quick preview
+                relevance_score = await self.preview_url(url, query_terms)
+                scored_results.append({
+                    "result": result,
+                    "score": relevance_score
+                })
+            except Exception as e:
+                logging.warning(f"Error scoring URL {url}: {e}")
+                continue
+        
         # Keep all results with acceptable scores instead of just the top ones
         valid_results = [r for r in scored_results if r["score"] > 0.3]
         
@@ -653,8 +677,19 @@ class WebCrawler:
         Returns:
             List of dictionaries containing page data for all crawled pages
         """
+        # Add URL validation
+        if not start_url.startswith(('http://', 'https://')):
+            raise ValueError(f"Invalid URL scheme: {start_url}. URL must start with http:// or https://")
+
         all_pages = []
         visited_urls = set()
+        
+        # Add error handling for crawler initialization
+        try:
+            await self._ensure_crawler()
+        except Exception as e:
+            logging.error(f"Failed to initialize crawler: {e}")
+            return []
         
         logging.info(f"Starting deep crawl of {start_url} (max_pages={max_pages}, max_depth={max_depth})")
         
@@ -674,7 +709,9 @@ class WebCrawler:
         
         # Use parallel approach to explore the site
         async def process_url(url, depth):
-            async with semaphore:  # Control concurrency
+            async with semaphore:
+                if not url.startswith(('http://', 'https://')):
+                    return []
                 if url in visited_urls or len(all_pages) >= max_pages:
                     return []
                 
@@ -682,36 +719,46 @@ class WebCrawler:
                 result_pages = []
                 
                 try:
-                    # Crawl the page
-                    page_data = await self.crawl_page(url)
+                    # Add timeout protection
+                    page_data = await asyncio.wait_for(
+                        self.crawl_page(url),
+                        timeout=15  # 15 second timeout
+                    )
                     page_data['depth'] = depth
                     result_pages.append(page_data)
                     
-                    # If depth limit not reached, extract and process links
                     if depth < max_depth and len(all_pages) + len(result_pages) < max_pages:
-                        links = await self._extract_links(url)
-                        
-                        # Filter links to stay on the same domain
-                        filtered_links = []
-                        for link in links:
-                            try:
-                                parsed_link = urlparse(link)
-                                # Only include links from the same domain and not yet visited
-                                if parsed_link.netloc == base_domain and link not in visited_urls:
-                                    filtered_links.append(link)
-                            except Exception:
-                                continue
-                        
-                        # Limit number of links to process to avoid overwhelming
-                        filtered_links = filtered_links[:max(5, (max_pages - len(all_pages) - len(result_pages)))]
-                        
-                        # Process links in parallel
-                        if filtered_links:
-                            tasks = [process_url(link, depth + 1) for link in filtered_links]
-                            nested_results = await asyncio.gather(*tasks)
-                            for nested_result in nested_results:
-                                result_pages.extend(nested_result)
+                        try:
+                            links = await asyncio.wait_for(
+                                self._extract_links(url),
+                                timeout=10
+                            )
+                            
+                            # Filter invalid URLs
+                            filtered_links = [
+                                link for link in links 
+                                if link.startswith(('http://', 'https://')) 
+                                and link not in visited_urls
+                                and urlparse(link).netloc == base_domain
+                            ]
+                            
+                            # Limit number of links to process to avoid overwhelming
+                            filtered_links = filtered_links[:max(5, (max_pages - len(all_pages) - len(result_pages)))]
+                            
+                            # Process links in parallel
+                            if filtered_links:
+                                tasks = [process_url(link, depth + 1) for link in filtered_links]
+                                nested_results = await asyncio.gather(*tasks)
+                                for nested_result in nested_results:
+                                    result_pages.extend(nested_result)
                 
+                        except asyncio.TimeoutError:
+                            logging.warning(f"Timeout extracting links from {url}")
+                        except Exception as e:
+                            logging.error(f"Error extracting links from {url}: {e}")
+                
+                except asyncio.TimeoutError:
+                    logging.warning(f"Timeout processing {url}")
                 except Exception as e:
                     logging.error(f"Error processing {url}: {e}")
                 
