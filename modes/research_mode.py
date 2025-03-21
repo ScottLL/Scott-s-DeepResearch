@@ -17,6 +17,10 @@ from tools import (
     ImageRelevanceTool
 )
 import re
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def ensure_json_serializable(data):
     """
@@ -40,7 +44,7 @@ async def ensure_json_serializable(data):
     else:
         return data
 
-async def run_research_mode(query: str, iterations: int, breadth: int, depth: int = 2):
+async def run_research_mode(query: str, iterations: int, breadth: int, depth: int = 2, query_analysis=None, clarifying_responses=None):
     """Run the deep research process for a given query."""
     crawler = WebCrawler()
     
@@ -69,11 +73,14 @@ async def run_research_mode(query: str, iterations: int, breadth: int, depth: in
     query_language = detect_language(query)
     print(f"\n** Query language detected: {query_language} **")
     
-    # Analyze and improve the initial query
-    print("\n** Analyzing query to improve search effectiveness **")
-    
-    # Use the async function directly and await it
-    query_analysis = await async_analyze_query(query)
+    # Analyze and improve the initial query if analysis not provided
+    if not query_analysis:
+        print("\n** Analyzing query to improve search effectiveness **")
+        
+        # Use the async function directly and await it
+        query_analysis = await async_analyze_query(query)
+    else:
+        print("\n** Using provided query analysis **")
     
     # Ensure query_analysis is a valid dictionary
     if not isinstance(query_analysis, dict):
@@ -119,9 +126,11 @@ async def run_research_mode(query: str, iterations: int, breadth: int, depth: in
     # Directly use the clarifying questions from query analysis
     print("\nClarifying questions to consider:")
     clarifying_questions = query_analysis.get("clarifying_questions", [])
-    clarifying_responses = {}
+    
+    if clarifying_responses is None:
+        clarifying_responses = {}
 
-    if clarifying_questions:
+    if clarifying_questions and not clarifying_responses:
         import sys
         
         # Clear any potential input buffer
@@ -132,7 +141,9 @@ async def run_research_mode(query: str, iterations: int, breadth: int, depth: in
         except ImportError:
             # Not on Windows, try another approach
             try:
-                import termios, tty, fcntl, os
+                # Import os here specifically to avoid shadowing the global import
+                import termios, tty, fcntl
+                # Use the os module that was imported at the module level
                 fd = sys.stdin.fileno()
                 flags_save = fcntl.fcntl(fd, fcntl.F_GETFL)
                 fcntl.fcntl(fd, fcntl.F_SETFL, flags_save | os.O_NONBLOCK)
@@ -436,6 +447,7 @@ async def run_research_mode(query: str, iterations: int, breadth: int, depth: in
     # Save results
     base_name = "research_results"
     if query:
+        # Create a consistent safe filename for both saving and reading
         safe_query = "".join(c for c in query[:50] if c.isalnum() or c in " _-")
         base_name = f"results_{safe_query.strip().replace(' ','_')}" or base_name
     json_path = base_name + ".json"
@@ -472,7 +484,44 @@ async def run_research_mode(query: str, iterations: int, breadth: int, depth: in
     reporting.save_markdown(md_content, md_path)
     
     print(f"\nResearch complete. Results saved to {md_path} and {json_path}")
-    return md_content 
+    
+    # Use the same path variables for reading the file that we used for saving
+    # Instead of creating new paths which might be different due to handling of special characters
+    logger.info(f"Looking for results file at {md_path}")
+    
+    # Check if the markdown file exists using the same path used for saving
+    if os.path.exists(md_path):
+        logger.info(f"Found results file: {md_path}")
+        try:
+            # Read markdown content
+            with open(md_path, 'r', encoding='utf-8') as f:
+                saved_md_content = f.read()
+                
+            # Convert markdown to HTML
+            import markdown
+            html_content = markdown.markdown(
+                saved_md_content,
+                extensions=['tables', 'nl2br', 'fenced_code']
+            )
+            
+            # Return structured results using the content we just created
+            return {
+                'markdown': saved_md_content,
+                'html': html_content,
+                'source_file': md_path,
+                'json_file': json_path if os.path.exists(json_path) else None
+            }
+        except Exception as e:
+            logger.error(f"Error reading results file: {e}")
+            logger.exception(e)  # Print the full traceback
+            
+    # If we can't read the file, return the content we just generated
+    # instead of creating a placeholder
+    return {
+        'markdown': md_content,
+        'html': markdown.markdown(md_content, extensions=['tables', 'nl2br', 'fenced_code']),
+        'source_file': md_path
+    }
 
 async def process_images_for_relevance(image_urls, topic):
     image_tool = ImageRelevanceTool()

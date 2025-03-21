@@ -23,13 +23,14 @@ async def ensure_json_serializable(data):
     else:
         return data
 
-async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: bool = False):
+async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, message_queue=None, raw_only: bool = False):
     """Run a basic web crawl on a site and generate a summary.
     
     Args:
         url: The URL to crawl
         max_pages: Maximum number of pages to crawl
         crawl_depth: Maximum depth of links to follow
+        message_queue: Optional asyncio.Queue to send progress messages to
         raw_only: If True, skip analysis and only return raw content
     """
     crawler = None
@@ -45,11 +46,31 @@ async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: b
         crawler = WebCrawler()
         print(f"Starting crawl on {url}")
         
+        # Send progress update to WebSocket
+        if message_queue:
+            await message_queue.put({
+                'type': 'message',
+                'message': f"Starting web crawl of {url} (max pages: {max_pages}, depth: {crawl_depth})"
+            })
+        
         # Use semaphore to control concurrency
         semaphore = asyncio.Semaphore(10)  # Allow 10 concurrent requests
+        
+        # Send another update
+        if message_queue:
+            await message_queue.put({
+                'type': 'message',
+                'message': "Initializing crawler and beginning the crawl..."
+            })
+            
         pages = await crawler.deep_crawl_site(url, max_pages=max_pages, max_depth=crawl_depth, semaphore=semaphore)
         
         print(f"Crawled {len(pages)} pages. Processing content...")
+        if message_queue:
+            await message_queue.put({
+                'type': 'message',
+                'message': f"Successfully crawled {len(pages)} pages. Processing content..."
+            })
         
         # Detect site language from the first page content
         site_language = "en"  # Default to English
@@ -58,13 +79,28 @@ async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: b
                 try:
                     site_language = detect_language(page['content'])
                     print(f"Site language detected: {site_language}")
+                    if message_queue:
+                        await message_queue.put({
+                            'type': 'message',
+                            'message': f"Site language detected: {site_language}"
+                        })
                     break
                 except Exception as e:
                     print(f"Error detecting language: {e}")
+                    if message_queue:
+                        await message_queue.put({
+                            'type': 'message',
+                            'message': f"Error detecting language: {e}"
+                        })
                     continue
         
         # Skip individual page summaries and use raw content directly
         print("Using raw content from crawled pages...")
+        if message_queue:
+            await message_queue.put({
+                'type': 'message',
+                'message': "Analyzing crawled content..."
+            })
         all_content = []
         
         # Collect content from all pages
@@ -76,6 +112,11 @@ async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: b
         # Skip overview generation if raw_only is True
         if not raw_only and all_content:
             print("\nGenerating site overview...")
+            if message_queue:
+                await message_queue.put({
+                    'type': 'message',
+                    'message': "Generating site overview..."
+                })
             prompt = f"Provide a comprehensive overview of this website: {url}"
             try:
                 # Use async version directly with raw content
@@ -92,16 +133,36 @@ async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: b
                     overview_text = str(overview)
                 
                 print("\nOverview generated.")
+                if message_queue:
+                    await message_queue.put({
+                        'type': 'message',
+                        'message': "Overview generated successfully!"
+                    })
             except Exception as e:
                 print(f"Error generating overview: {e}")
+                if message_queue:
+                    await message_queue.put({
+                        'type': 'error',
+                        'error': f"Error generating overview: {e}"
+                    })
                 overview_text = f"Error generating overview for {url}: {str(e)}"
         else:
             if raw_only:
                 print("\nSkipping overview generation as raw_only=True.")
+                if message_queue:
+                    await message_queue.put({
+                        'type': 'message',
+                        'message': "Skipping overview generation (raw content only mode)."
+                    })
                 overview_text = "No overview generated (raw content only mode)."
             else:
                 overview_text = f"No content could be extracted from {url}."
                 print("\nNo content could be extracted for analysis.")
+                if message_queue:
+                    await message_queue.put({
+                        'type': 'warning',
+                        'message': "No significant content could be extracted for analysis."
+                    })
         
         # Save results
         try:
@@ -110,6 +171,12 @@ async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: b
             json_path = base_name + ".json"
             md_path = base_name + ".md"
             
+            if message_queue:
+                await message_queue.put({
+                    'type': 'message',
+                    'message': "Generating final report..."
+                })
+                
             # Before saving, ensure all data is JSON serializable
             data = {
                 "url": url,
@@ -143,12 +210,41 @@ async def run_crawl_mode(url: str, max_pages: int, crawl_depth: int, raw_only: b
             reporting.save_markdown(md_content, md_path)
             
             print(f"\nCrawl complete. Results saved to {md_path} and {json_path}")
-            return md_content
+            if message_queue:
+                await message_queue.put({
+                    'type': 'message',
+                    'message': f"Crawl complete! Results saved to {md_path} and {json_path}"
+                })
+                # Signal that we're done
+                await message_queue.put(None)
+                
+            return {
+                "success": True,
+                "url": url,
+                "markdown": md_content,
+                "json_path": json_path,
+                "md_path": md_path,
+                "pages_crawled": len(pages)
+            }
         except Exception as e:
             print(f"Error saving results: {e}")
+            if message_queue:
+                await message_queue.put({
+                    'type': 'error',
+                    'error': f"Error saving results: {e}"
+                })
+                # Signal that we're done even with an error
+                await message_queue.put(None)
             return f"Error saving results: {e}"
     except Exception as e:
         print(f"Error in crawl mode: {e}")
+        if message_queue:
+            await message_queue.put({
+                'type': 'error',
+                'error': f"Error in crawl mode: {e}"
+            })
+            # Signal that we're done with an error
+            await message_queue.put(None)
         return f"Error in crawl mode: {e}"
     finally:
         # Ensure we properly close the crawler in all cases

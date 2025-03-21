@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Research Agent</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f7fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Layout Structure */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.5rem;
+            color: #ecf0f1;
+        }
+
+        .sidebar-content {
+            padding: 1rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-section h3 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            color: #3498db;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Main Content Styles */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            height: 100vh;
+        }
+
+        /* Mode Selection */
+        .mode-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .mode-btn {
+            padding: 0.8rem 1rem;
+            border: none;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ecf0f1;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .mode-btn i {
+            margin-right: 0.5rem;
+            width: 16px;
+            text-align: center;
+        }
+
+        .mode-btn.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        /* Research Settings */
+        .setting-group {
+            margin-bottom: 1rem;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ecf0f1;
+        }
+
+        .setting-select {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ecf0f1;
+        }
+
+        /* Parameters */
+        .parameters {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .parameter-group {
+            margin-bottom: 1rem;
+        }
+
+        .slider {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .value-display {
+            font-size: 0.85rem;
+            color: #bdc3c7;
+            text-align: right;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Input Section */
+        .input-section {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        textarea, input[type="url"] {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            min-height: 120px;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 1rem;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            color: #7f8c8d;
+            border-top: 1px solid #eee;
+        }
+        
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 300px;
+            }
+            
+            .main-content {
+                height: auto;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-search"></i> Deep Research</h2>
+            </div>
+            
+            <div class="sidebar-content">
+                <!-- Mode Selection -->
+                <div class="sidebar-section">
+                    <h3>Research Mode</h3>
+                    <div class="mode-buttons">
+                        <button class="mode-btn active" data-mode="research">
+                            <i class="fas fa-book"></i> Research Query
+                        </button>
+                        <button class="mode-btn" data-mode="crawl">
+                            <i class="fas fa-spider"></i> Website Crawl
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Research Settings -->
+                <div class="sidebar-section">
+                    <h3>Research Settings</h3>
+                    <div class="settings-container">
+                        <!-- Preset Mode -->
+                        <div class="setting-group">
+                            <label>Research Depth</label>
+                            <select id="presetMode" class="setting-select">
+                                <option value="quick">Quick Overview</option>
+                                <option value="standard" selected>Standard Research</option>
+                                <option value="deep">Deep Dive</option>
+                                <option value="comprehensive">Comprehensive Analysis</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+
+                        <!-- Parameters -->
+                        <div class="parameters">
+                            <div class="parameter-group research-only">
+                                <label>Crawl Depth</label>
+                                <input type="range" id="depth" min="1" max="5" value="2" class="slider">
+                                <span class="value-display">2</span>
+                            </div>
+
+                            <div class="parameter-group research-only">
+                                <label>Search Breadth</label>
+                                <input type="range" id="breadth" min="1" max="10" value="4" class="slider">
+                                <span class="value-display">4</span>
+                            </div>
+
+                            <div class="parameter-group research-only">
+                                <label>Research Iterations</label>
+                                <input type="range" id="iterations" min="1" max="5" value="3" class="slider">
+                                <span class="value-display">3</span>
+                            </div>
+
+                            <div class="parameter-group crawl-only" style="display: none;">
+                                <label>Max Pages</label>
+                                <input type="range" id="maxPages" min="1" max="20" value="5" class="slider">
+                                <span class="value-display">5</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <header>
+                <h1>Deep Research Agent</h1>
+                <p class="subtitle">Your AI-powered research assistant</p>
+            </header>
+
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="research-input">
+                    <textarea id="researchQuery" placeholder="Enter your research question..."></textarea>
+                    <button id="startResearch" class="action-btn">
+                        <i class="fas fa-search"></i> Start Research
+                    </button>
+                </div>
+
+                <div class="crawl-input" style="display: none;">
+                    <input type="url" id="crawlUrl" placeholder="Enter website URL...">
+                    <button id="startCrawl" class="action-btn">
+                        <i class="fas fa-spider"></i> Start Crawling
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="progress-section" style="display: none;">
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">Processing...</div>
+                </div>
+                <div class="terminal-output"></div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2>Research Results</h2>
+                    <div class="results-tabs">
+                        <button class="tab-btn active" data-tab="report">Report</button>
+                        <button class="tab-btn" data-tab="markdown">Raw Markdown</button>
+                        <button class="tab-btn" data-tab="download">Download</button>
+                        <button class="tab-btn" data-tab="preview">HTML Preview</button>
+                    </div>
+                </div>
+                <div class="results-content">
+                    <div class="tab-content active" id="report-content"></div>
+                    <div class="tab-content" id="markdown-content"></div>
+                    <div class="tab-content" id="download-content"></div>
+                    <div class="tab-content" id="preview-content"></div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer>
+                <p>Built with <i class="fas fa-heart"></i> and Crawl4AI 🚀</p>
+            </footer>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
